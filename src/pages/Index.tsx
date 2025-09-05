@@ -115,18 +115,28 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen py-8 px-4" style={{ backgroundColor: '#267cb9ff' }}>
-      <div className="container max-w-2xl mx-auto">
+  <div className="min-h-screen py-4 px-2 flex justify-center items-center" style={{ backgroundColor: '#85afcdff' }}>
+      <div
+        className="w-full"
+        style={{
+          maxWidth: '480px',
+          margin: '0 auto',
+          boxSizing: 'border-box',
+          borderRadius: '16px',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+          padding: '8px',
+        }}
+      >
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-foreground mb-2">
             Cadastro de Fotos
           </h1>
-          <p className="text-lg text-muted-foreground">
+          <p className="text-lg mb-0" style={{ color: '#111711ff', fontWeight: 500 }}>
             Registre suas fotos com descrição e data
           </p>
         </div>
 
-        <Card>
+  <Card style={{ backgroundColor: '#736fc7ff', color: '#fff', borderRadius: '12px', boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Camera className="h-5 w-5" />
@@ -228,9 +238,10 @@ const Index = () => {
               </div>
 
               <Button 
-                type="submit" 
-                className="w-full" 
+                type="submit"
+                className="w-full"
                 disabled={isSubmitting}
+                style={{ backgroundColor: '#b06a98ff', color: '#fff', fontWeight: 600 }}
               >
                 {isSubmitting ? "Cadastrando..." : "Cadastrar Foto"}
               </Button>
