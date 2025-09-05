@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Camera, Calendar, FileText, Link } from "lucide-react";
+import { Camera, Calendar, FileText, Link, Upload, ImagePlus } from "lucide-react";
 
 interface PhotoData {
   description: string;
@@ -17,8 +18,68 @@ interface PhotoData {
 
 const Index = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isTakingPhoto, setIsTakingPhoto] = useState(false);
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const { toast } = useToast();
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<PhotoData>();
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<PhotoData>();
+  
+  const watchedPhotoUrl = watch("photo_url");
+
+  const takePicture = async () => {
+    setIsTakingPhoto(true);
+    
+    try {
+      const image = await CapacitorCamera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Camera,
+      });
+
+      if (image.base64String) {
+        const fileName = `photo-${Date.now()}.${image.format}`;
+        const base64Data = image.base64String;
+        
+        // Convert base64 to blob
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: `image/${image.format}` });
+
+        // Upload to Supabase Storage
+        const { data, error } = await supabase.storage
+          .from('photos')
+          .upload(fileName, blob);
+
+        if (error) throw error;
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('photos')
+          .getPublicUrl(fileName);
+
+        setCapturedPhoto(publicUrl);
+        setValue("photo_url", publicUrl);
+        
+        toast({
+          title: "Foto capturada!",
+          description: "Foto salva com sucesso.",
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao capturar foto:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível capturar a foto. Verifique as permissões da câmera.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTakingPhoto(false);
+    }
+  };
 
   const onSubmit = async (data: PhotoData) => {
     setIsSubmitting(true);
@@ -40,6 +101,7 @@ const Index = () => {
       });
       
       reset();
+      setCapturedPhoto(null);
     } catch (error) {
       console.error("Erro ao cadastrar foto:", error);
       toast({
@@ -94,26 +156,58 @@ const Index = () => {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="photo_url" className="flex items-center gap-2">
-                  <Link className="h-4 w-4" />
-                  URL da Foto
+              <div className="space-y-4">
+                <Label className="flex items-center gap-2">
+                  <Camera className="h-4 w-4" />
+                  Foto
                 </Label>
-                <Input
-                  id="photo_url"
-                  type="url"
-                  placeholder="https://exemplo.com/foto.jpg"
-                  {...register("photo_url", { 
-                    required: "A URL da foto é obrigatória",
-                    pattern: {
-                      value: /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)$/i,
-                      message: "Digite uma URL válida de imagem"
-                    }
-                  })}
-                />
-                {errors.photo_url && (
-                  <p className="text-sm text-destructive">{errors.photo_url.message}</p>
+                
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={takePicture}
+                    disabled={isTakingPhoto}
+                    className="flex items-center gap-2"
+                  >
+                    <ImagePlus className="h-4 w-4" />
+                    {isTakingPhoto ? "Capturando..." : "Tirar Foto"}
+                  </Button>
+                </div>
+                
+                {capturedPhoto && (
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <img 
+                        src={capturedPhoto} 
+                        alt="Foto capturada" 
+                        className="w-full max-w-sm rounded-lg border"
+                      />
+                    </div>
+                  </div>
                 )}
+                
+                <div className="space-y-2">
+                  <Label htmlFor="photo_url" className="flex items-center gap-2">
+                    <Link className="h-4 w-4" />
+                    Ou cole a URL da Foto
+                  </Label>
+                  <Input
+                    id="photo_url"
+                    type="url"
+                    placeholder="https://exemplo.com/foto.jpg"
+                    {...register("photo_url", { 
+                      required: "É necessário capturar uma foto ou inserir uma URL",
+                      pattern: {
+                        value: /^https?:\/\/.+/i,
+                        message: "Digite uma URL válida"
+                      }
+                    })}
+                  />
+                  {errors.photo_url && (
+                    <p className="text-sm text-destructive">{errors.photo_url.message}</p>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-2">
